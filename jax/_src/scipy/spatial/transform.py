@@ -30,6 +30,45 @@ class Rotation(typing.NamedTuple):
   quat: jax.Array
 
   @classmethod
+  def align_vectors(cls, a: jax.Array, b: jax.Array, weights: typing.Optional[jax.Array] = None, return_sensitivity: bool = False):
+    """Estimate a rotation to optimally align two sets of vectors."""
+    a = jnp.asarray(a)
+    if a.ndim != 2 or a.shape[-1] != 3:
+      raise ValueError("Expected input `a` to have shape (N, 3), "
+                       "got {}".format(a.shape))
+    b = jnp.asarray(b)
+    if b.ndim != 2 or b.shape[-1] != 3:
+      raise ValueError("Expected input `b` to have shape (N, 3), "
+                       "got {}.".format(b.shape))
+    if a.shape != b.shape:
+      raise ValueError("Expected inputs `a` and `b` to have same shapes"
+                       ", got {} and {} respectively.".format(a.shape, b.shape))
+    if weights is None:
+      weights = jnp.ones(len(b), dtype=b.dtype)
+    else:
+      weights = jnp.asarray(weights)
+      if weights.ndim != 1:
+        raise ValueError("Expected `weights` to be 1 dimensional, got "
+                         "shape {}.".format(weights.shape))
+      if weights.shape[0] != b.shape[0]:
+        raise ValueError("Expected `weights` to have number of values "
+                         "equal to number of input vectors, got "
+                         "{} values and {} vectors.".format(
+                           weights.shape[0], b.shape[0]))
+      if jnp.any(weights < 0):
+        raise ValueError("`weights` may not contain negative values")
+    matrix, rssd, sensitivity = _align_vectors(a, b, weights)
+    if return_sensitivity:
+      return cls.from_matrix(matrix), rssd, sensitivity
+    else:
+      return cls.from_matrix(matrix), rssd
+
+  @classmethod
+  def create_group(cls, group: str, axis: str = 'Z'):
+    """Create a 3D rotation group."""
+    return _create_group(cls, group, axis=axis)
+
+  @classmethod
   def concatenate(cls, rotations: typing.Sequence):
     """Concatenate a sequence of `Rotation` objects."""
     return cls(jnp.concatenate([rotation.quat for rotation in rotations]))
@@ -161,6 +200,10 @@ class Rotation(typing.NamedTuple):
     _, v = jnp.linalg.eigh(K)
     return Rotation(v[:, -1])
 
+  def reduce(self, left=None, right=None, return_indices=False):
+    """Reduce this rotation with the provided rotation groups."""
+    raise NotImplementedError
+
   @property
   def single(self) -> bool:
     """Whether this instance represents a single rotation."""
@@ -214,6 +257,24 @@ class Slerp(typing.NamedTuple):
     if single_time:
       return result[0]
     return result
+
+
+@functools.partial(jnp.vectorize, signature='(m,n),(m,n),(m)->(n,n),(),(n,n)')
+def _align_vectors(a: jax.Array, b: jax.Array, weights: jax.Array) -> typing.Tuple[jax.Array, jax.Array, jax.Array]:
+  B = jnp.einsum('ji,jk->ik', weights[:, jnp.newaxis] * a, b)
+  u, s, vh = jnp.linalg.svd(B)
+  is_neg_det = jnp.linalg.det(u @ vh) < 0
+  s = s.at[-1].set(jnp.where(is_neg_det, -s[-1], s[-1]))
+  u = u.at[:, -1].set(jnp.where(is_neg_det, -u[:, -1], u[:, -1]))
+  C = jnp.dot(u, vh)
+  # if s[1] + s[2] < 1e-16 * s[0]:
+  #   warnings.warn("Optimal rotation is not uniquely or poorly defined for the given sets of vectors.")
+  rssd = jnp.sqrt(jnp.maximum(jnp.sum(weights * jnp.sum(b*b + a*a, axis=1)) - 2 * jnp.sum(s), 0.))
+  zeta = (s[0] + s[1]) * (s[1] + s[2]) * (s[2] + s[0])
+  kappa = s[0] * s[1] + s[1] * s[2] + s[2] * s[0]
+  # with jnp.errstate(divide='ignore', invalid='ignore'):
+  sensitivity = jnp.mean(weights) / zeta * (kappa * jnp.eye(3) + jnp.dot(B, B.T))
+  return C, rssd, sensitivity
 
 
 @functools.partial(jnp.vectorize, signature='(m,m),(m),()->(m)')
@@ -301,6 +362,37 @@ def _compute_euler_from_quat(quat: jax.Array, axes: jax.Array, extrinsic: bool, 
   return jnp.where(degrees, jnp.rad2deg(angles), angles)
 
 
+def _create_group(cls, group: str, axis: str = 'Z') -> Rotation:
+  if not isinstance(group, str):
+      raise ValueError("`group` argument must be a string")
+  permitted_axes = ['x', 'y', 'z', 'X', 'Y', 'Z']
+  if axis not in permitted_axes:
+      raise ValueError("`axis` must be one of " + ", ".join(permitted_axes))
+  if group in ['I', 'O', 'T']:
+      symbol = group
+      order = 1
+  elif group[:1] in ['C', 'D'] and group[1:].isdigit():
+      symbol = group[:1]
+      order = int(group[1:])
+  else:
+      raise ValueError("`group` must be one of 'I', 'O', 'T', 'Dn', 'Cn'")
+  if order < 1:
+      raise ValueError("Group order must be positive")
+  axis = 'xyz'.index(axis.lower())
+  if symbol == 'I':
+      return icosahedral(cls)
+  elif symbol == 'O':
+      return octahedral(cls)
+  elif symbol == 'T':
+      return tetrahedral(cls)
+  elif symbol == 'D':
+      return dicyclic(cls, order, axis=axis)
+  elif symbol == 'C':
+      return cyclic(cls, order, axis=axis)
+  else:
+      assert False
+
+
 def _elementary_basis_index(axis: str) -> int:
   if axis == 'x':
     return 0
@@ -381,6 +473,73 @@ def _make_elementary_quat(axis: int, angle: jax.Array) -> jax.Array:
 @functools.partial(jnp.vectorize, signature='(n)->(n)')
 def _normalize_quaternion(quat: jax.Array) -> jax.Array:
   return quat / _vector_norm(quat)
+
+
+def _reduce(self, left=None, right=None, return_indices=False):
+  if left is None and right is None:
+    reduced = self.__class__(self._quat, normalize=False, copy=True)
+    if return_indices:
+      return reduced, None, None
+    else:
+      return reduced
+  elif right is None:
+    right = Rotation.identity()
+  elif left is None:
+    left = Rotation.identity()
+
+  # Levi-Civita tensor for triple product computations
+  e = np.zeros((3, 3, 3))
+  e[0, 1, 2] = e[1, 2, 0] = e[2, 0, 1] = 1
+  e[0, 2, 1] = e[2, 1, 0] = e[1, 0, 2] = -1
+
+  # We want to calculate the real components of q = l * p * r. It can
+  # be shown that:
+  #     qs = ls * ps * rs - ls * dot(pv, rv) - ps * dot(lv, rv)
+  #          - rs * dot(lv, pv) - dot(cross(lv, pv), rv)
+  # where ls and lv denote the scalar and vector components of l.
+
+  def split_rotation(R):
+    q = np.atleast_2d(R.as_quat())
+    return q[:, -1], q[:, :-1]
+
+  p = self
+  ps, pv = split_rotation(p)
+  ls, lv = split_rotation(left)
+  rs, rv = split_rotation(right)
+
+  qs = np.abs(np.einsum('i,j,k', ls, ps, rs) -
+              np.einsum('i,jx,kx', ls, pv, rv) -
+              np.einsum('ix,j,kx', lv, ps, rv) -
+              np.einsum('ix,jx,k', lv, pv, rs) -
+              np.einsum('xyz,ix,jy,kz', e, lv, pv, rv))
+  qs = np.reshape(np.moveaxis(qs, 1, 0), (qs.shape[1], -1))
+
+  # Find best indices from scalar components
+  max_ind = np.argmax(np.reshape(qs, (len(qs), -1)), axis=1)
+  left_best = max_ind // len(rv)
+  right_best = max_ind % len(rv)
+
+  if not left.single:
+    left = left[left_best]
+  if not right.single:
+    right = right[right_best]
+
+  # Reduce the rotation using the best indices
+  reduced = left * p * right
+  if self._single:
+    # Reduce the rotation using the best indices
+    reduced = self.__class__(reduced.as_quat()[0], normalize=False)
+    left_best = left_best[0]
+    right_best = right_best[0]
+
+  if return_indices:
+    if left is None:
+      left_best = None
+    if right is None:
+      right_best = None
+    return reduced, left_best, right_best
+  else:
+    return reduced
 
 
 @functools.partial(jnp.vectorize, signature='(n)->()')
