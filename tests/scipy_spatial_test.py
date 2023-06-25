@@ -50,10 +50,9 @@ class LaxBackedScipySpatialTransformTests(jtu.JaxTestCase):
     rng = jtu.rand_default(self.rng())
     args_maker = lambda: (rng(shape, dtype), rng(vector_shape, dtype),)
     jnp_fn = lambda q, v: jsp_Rotation.from_quat(q).apply(v, inverse=inverse)
-    # TODO(chrisflesher): re-enable this after accounting for sign degeneracy
-    # np_fn = lambda q, v: osp_Rotation.from_quat(q).apply(v, inverse=inverse).astype(dtype)  # HACK
+    np_fn = lambda q, v: osp_Rotation.from_quat(q).apply(v, inverse=inverse).astype(dtype)  # HACK
     tol = 5e-2 if jtu.device_under_test() == 'tpu' else 1e-4
-    # self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=tol)
+    self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=tol)
     self._CompileAndCheck(jnp_fn, args_maker, tol=tol)
 
   @jtu.sample_product(
@@ -170,9 +169,8 @@ class LaxBackedScipySpatialTransformTests(jtu.JaxTestCase):
     rng = jtu.rand_default(self.rng())
     args_maker = lambda: (rng(shape, dtype),)
     jnp_fn = lambda m: jsp_Rotation.from_matrix(m).as_rotvec()
-    # TODO(chrisflesher): re-enable this after accounting for sign degeneracy
-    # np_fn = lambda m: osp_Rotation.from_matrix(m).as_rotvec().astype(dtype)  # HACK
-    # self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
+    np_fn = lambda m: osp_Rotation.from_matrix(m).as_rotvec().astype(dtype)  # HACK
+    self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
     self._CompileAndCheck(jnp_fn, args_maker, atol=1e-4)
 
   @jtu.sample_product(
