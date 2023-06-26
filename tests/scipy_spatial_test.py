@@ -42,15 +42,20 @@ class LaxBackedScipySpatialTransformTests(jtu.JaxTestCase):
   @jtu.sample_product(
     dtype=float_dtypes,
     shape=[(2, 3)],
+    use_weights=[False, True],
+    return_sensitivity=[False, True],
   )
-  def testRotationAlignVectors(self, shape, dtype):
+  def testRotationAlignVectors(self, shape, dtype, use_weights, return_sensitivity):
     rng = jtu.rand_default(self.rng())
-    args_maker = lambda: (rng(shape, dtype), rng(shape, dtype),)
-    jnp_fn = lambda a, b: jsp_Rotation.align_vectors(a, b)[0].as_rotvec()
-    np_fn = lambda a, b: osp_Rotation.align_vectors(a, b)[0].as_rotvec()
-    tol = 5e-2 if jtu.device_under_test() == 'tpu' else 1e-4
-    self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=tol)
-    self._CompileAndCheck(jnp_fn, args_maker, tol=tol)
+    args_maker = lambda: (rng(shape, dtype), rng(shape, dtype), onp.abs(rng(shape[-2], dtype)) if use_weights else None)
+    def jnp_fn(a, b, weights):
+      result = jsp_Rotation.align_vectors(a, b, weights, return_sensitivity)
+      return (result[0].as_rotvec(), *result[1:])
+    def np_fn(a, b, weights):
+      result = osp_Rotation.align_vectors(a, b, weights, return_sensitivity)
+      return (result[0].as_rotvec(), *result[1:])
+    self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=False, tol=1e-4)
+    self._CompileAndCheck(jnp_fn, args_maker, tol=1e-4)
 
   # @jtu.sample_product(
   #   dtype=float_dtypes,

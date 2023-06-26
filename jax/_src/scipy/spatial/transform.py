@@ -33,30 +33,19 @@ class Rotation(typing.NamedTuple):
   def align_vectors(cls, a: jax.Array, b: jax.Array, weights: typing.Optional[jax.Array] = None, return_sensitivity: bool = False):
     """Estimate a rotation to optimally align two sets of vectors."""
     a = jnp.asarray(a)
-    if a.ndim != 2 or a.shape[-1] != 3:
-      raise ValueError("Expected input `a` to have shape (N, 3), "
+    if a.ndim < 2 or a.shape[-1] != 3:
+      raise ValueError("Expected input `a` to have shape (..., 3), "
                        "got {}".format(a.shape))
     b = jnp.asarray(b)
-    if b.ndim != 2 or b.shape[-1] != 3:
-      raise ValueError("Expected input `b` to have shape (N, 3), "
+    if b.ndim < 2 or b.shape[-1] != 3:
+      raise ValueError("Expected input `b` to have shape (..., 3), "
                        "got {}.".format(b.shape))
-    if a.shape != b.shape:
-      raise ValueError("Expected inputs `a` and `b` to have same shapes"
-                       ", got {} and {} respectively.".format(a.shape, b.shape))
     if weights is None:
-      weights = jnp.ones(len(b), dtype=b.dtype)
+      weights = jnp.ones(b.shape[-2], dtype=b.dtype)
     else:
-      weights = jnp.asarray(weights)
-      if weights.ndim != 1:
-        raise ValueError("Expected `weights` to be 1 dimensional, got "
-                         "shape {}.".format(weights.shape))
-      if weights.shape[0] != b.shape[0]:
-        raise ValueError("Expected `weights` to have number of values "
-                         "equal to number of input vectors, got "
-                         "{} values and {} vectors.".format(
-                           weights.shape[0], b.shape[0]))
-      if jnp.any(weights < 0):
-        raise ValueError("`weights` may not contain negative values")
+      weights = jnp.asarray(weights, dtype=b.dtype)
+      # if jnp.any(weights < 0):  # this causes a concretization error...
+      #   raise ValueError("`weights` may not contain negative values")
     matrix, rssd, sensitivity = _align_vectors(a, b, weights)
     if return_sensitivity:
       return cls.from_matrix(matrix), rssd, sensitivity
@@ -273,7 +262,7 @@ def _align_vectors(a: jax.Array, b: jax.Array, weights: jax.Array) -> typing.Tup
   zeta = (s[0] + s[1]) * (s[1] + s[2]) * (s[2] + s[0])
   kappa = s[0] * s[1] + s[1] * s[2] + s[2] * s[0]
   # with jnp.errstate(divide='ignore', invalid='ignore'):
-  sensitivity = jnp.mean(weights) / zeta * (kappa * jnp.eye(3) + jnp.dot(B, B.T))
+  sensitivity = jnp.mean(weights) / zeta * (kappa * jnp.eye(3, dtype=B.dtype) + jnp.dot(B, B.T))
   return C, rssd, sensitivity
 
 
