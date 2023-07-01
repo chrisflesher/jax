@@ -220,7 +220,16 @@ class Rotation(typing.NamedTuple):
 
   def reduce(self, left=None, right=None, return_indices=False):
     """Reduce this rotation with the provided rotation groups."""
-    raise NotImplementedError
+    if left is None and right is None:
+      reduced = self.__class__(self.quat)
+      if return_indices:
+        return reduced, None, None
+      else:
+        return reduced
+    elif right is None:
+      right = Rotation.identity()
+    elif left is None:
+      left = Rotation.identity()
 
   @property
   def single(self) -> bool:
@@ -564,47 +573,23 @@ def _normalize_quaternion(quat: jax.Array) -> jax.Array:
   return quat / _vector_norm(quat)
 
 
-def _reduce(self, left=None, right=None, return_indices=False):
-  if left is None and right is None:
-    reduced = self.__class__(self._quat, normalize=False, copy=True)
-    if return_indices:
-      return reduced, None, None
-    else:
-      return reduced
-  elif right is None:
-    right = Rotation.identity()
-  elif left is None:
-    left = Rotation.identity()
+def _reduce(p: jax.Array, left: jax.Array, right: jax.Array, return_indices: bool):
+  e = jnp.zeros((3, 3, 3))
+  e = e.at[[0, 1, 2], [1, 2, 0], [2, 0, 1]].set(1)
+  e = e.at[[0, 2, 1], [2, 1, 0], [1, 0, 2]].set(-1)
+  ps, pv = _split_quaternion(p)
+  ls, lv = _split_quaternion(left)
+  rs, rv = _split_quaternion(right)
 
-  # Levi-Civita tensor for triple product computations
-  e = np.zeros((3, 3, 3))
-  e[0, 1, 2] = e[1, 2, 0] = e[2, 0, 1] = 1
-  e[0, 2, 1] = e[2, 1, 0] = e[1, 0, 2] = -1
-
-  # We want to calculate the real components of q = l * p * r. It can
-  # be shown that:
-  #     qs = ls * ps * rs - ls * dot(pv, rv) - ps * dot(lv, rv)
-  #          - rs * dot(lv, pv) - dot(cross(lv, pv), rv)
-  # where ls and lv denote the scalar and vector components of l.
-
-  def split_rotation(R):
-    q = np.atleast_2d(R.as_quat())
-    return q[:, -1], q[:, :-1]
-
-  p = self
-  ps, pv = split_rotation(p)
-  ls, lv = split_rotation(left)
-  rs, rv = split_rotation(right)
-
-  qs = np.abs(np.einsum('i,j,k', ls, ps, rs) -
-              np.einsum('i,jx,kx', ls, pv, rv) -
-              np.einsum('ix,j,kx', lv, ps, rv) -
-              np.einsum('ix,jx,k', lv, pv, rs) -
-              np.einsum('xyz,ix,jy,kz', e, lv, pv, rv))
-  qs = np.reshape(np.moveaxis(qs, 1, 0), (qs.shape[1], -1))
+  qs = jnp.abs(jnp.einsum('i,j,k', ls, ps, rs) -
+               jnp.einsum('i,jx,kx', ls, pv, rv) -
+               jnp.einsum('ix,j,kx', lv, ps, rv) -
+               jnp.einsum('ix,jx,k', lv, pv, rs) -
+               jnp.einsum('xyz,ix,jy,kz', e, lv, pv, rv))
+  qs = jnp.reshape(jnp.moveaxis(qs, 1, 0), (qs.shape[1], -1))
 
   # Find best indices from scalar components
-  max_ind = np.argmax(np.reshape(qs, (len(qs), -1)), axis=1)
+  max_ind = jnp.argmax(jnp.reshape(qs, (len(qs), -1)), axis=1)
   left_best = max_ind // len(rv)
   right_best = max_ind % len(rv)
 
@@ -629,6 +614,11 @@ def _reduce(self, left=None, right=None, return_indices=False):
     return reduced, left_best, right_best
   else:
     return reduced
+
+
+def _split_quaternion(q):
+  q = jnp.atleast_2d(q)
+  return q[:, -1], q[:, :-1]
 
 
 @functools.partial(jnp.vectorize, signature='(n)->()')
