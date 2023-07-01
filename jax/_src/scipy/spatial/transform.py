@@ -221,15 +221,24 @@ class Rotation(typing.NamedTuple):
   def reduce(self, left=None, right=None, return_indices=False):
     """Reduce this rotation with the provided rotation groups."""
     if left is None and right is None:
-      reduced = self.__class__(self.quat)
+      reduced = self.quat
       if return_indices:
         return reduced, None, None
       else:
         return reduced
-    elif right is None:
+    if right is None:
       right = Rotation.identity()
-    elif left is None:
+    if left is None:
       left = Rotation.identity()
+    reduced, left_best, right_best = _reduce(self.as_quat(), left.as_quat(), right.as_quat(), return_indices)
+    if return_indices:
+      if left is None:
+        left_best = None
+      if right is None:
+        right_best = None
+      return reduced, left_best, right_best
+    else:
+      return reduced
 
   @property
   def single(self) -> bool:
@@ -573,6 +582,7 @@ def _normalize_quaternion(quat: jax.Array) -> jax.Array:
   return quat / _vector_norm(quat)
 
 
+@functools.partial(jnp.vectorize, signature='(n),(n),(n),()->(n),(),()')
 def _reduce(p: jax.Array, left: jax.Array, right: jax.Array, return_indices: bool):
   e = jnp.zeros((3, 3, 3))
   e = e.at[[0, 1, 2], [1, 2, 0], [2, 0, 1]].set(1)
@@ -580,40 +590,25 @@ def _reduce(p: jax.Array, left: jax.Array, right: jax.Array, return_indices: boo
   ps, pv = _split_quaternion(p)
   ls, lv = _split_quaternion(left)
   rs, rv = _split_quaternion(right)
-
   qs = jnp.abs(jnp.einsum('i,j,k', ls, ps, rs) -
                jnp.einsum('i,jx,kx', ls, pv, rv) -
                jnp.einsum('ix,j,kx', lv, ps, rv) -
                jnp.einsum('ix,jx,k', lv, pv, rs) -
                jnp.einsum('xyz,ix,jy,kz', e, lv, pv, rv))
   qs = jnp.reshape(jnp.moveaxis(qs, 1, 0), (qs.shape[1], -1))
-
-  # Find best indices from scalar components
   max_ind = jnp.argmax(jnp.reshape(qs, (len(qs), -1)), axis=1)
   left_best = max_ind // len(rv)
   right_best = max_ind % len(rv)
-
   if not left.single:
     left = left[left_best]
   if not right.single:
     right = right[right_best]
-
-  # Reduce the rotation using the best indices
   reduced = left * p * right
-  if self._single:
-    # Reduce the rotation using the best indices
-    reduced = self.__class__(reduced.as_quat()[0], normalize=False)
+  if p.single:
+    reduced = p
     left_best = left_best[0]
     right_best = right_best[0]
-
-  if return_indices:
-    if left is None:
-      left_best = None
-    if right is None:
-      right_best = None
-    return reduced, left_best, right_best
-  else:
-    return reduced
+  return reduced, left_best, right_best
 
 
 def _split_quaternion(q):
