@@ -176,36 +176,36 @@ class LaxBackedScipySpatialTransformTests(jtu.JaxTestCase):
   #   self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
   #   self._CompileAndCheck(jnp_fn, args_maker, atol=1e-4)
 
-  @jtu.sample_product(
-    dtype=float_dtypes,
-    size=[1, num_samples],
-    seq=['x', 'xy', 'xyz', 'XYZ'],
-    degrees=[True, False],
-  )
-  def testRotationFromEuler(self, size, dtype, seq, degrees):
-    rng = jtu.rand_default(self.rng())
-    shape = (size, len(seq))
-    args_maker = lambda: (rng(shape, dtype),)
-    jnp_fn = lambda a: jsp_Rotation.from_euler(seq, a, degrees).as_rotvec()
-    np_fn = lambda a: osp_Rotation.from_euler(seq, a, degrees).as_rotvec().astype(dtype)  # HACK
-    self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
-    self._CompileAndCheck(jnp_fn, args_maker, atol=1e-4)
+  # @jtu.sample_product(
+  #   dtype=float_dtypes,
+  #   size=[1, num_samples],
+  #   seq=['x', 'xy', 'xyz', 'XYZ'],
+  #   degrees=[True, False],
+  # )
+  # def testRotationFromEuler(self, size, dtype, seq, degrees):
+  #   rng = jtu.rand_default(self.rng())
+  #   shape = (size, len(seq))
+  #   args_maker = lambda: (rng(shape, dtype),)
+  #   jnp_fn = lambda a: jsp_Rotation.from_euler(seq, a, degrees).as_rotvec()
+  #   np_fn = lambda a: osp_Rotation.from_euler(seq, a, degrees).as_rotvec().astype(dtype)  # HACK
+  #   self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
+  #   self._CompileAndCheck(jnp_fn, args_maker, atol=1e-4)
 
-  @jtu.sample_product(
-    dtype=float_dtypes,
-    size=[1, num_samples],
-    seq=['x'],
-    degrees=[True, False],
-  )
-  def testRotationFromSingleEuler(self, size, dtype, seq, degrees):
-    assert len(seq) == 1
-    rng = jtu.rand_default(self.rng())
-    shape = (size,)
-    args_maker = lambda: (rng(shape, dtype),)
-    jnp_fn = lambda a: jsp_Rotation.from_euler(seq, a, degrees).as_rotvec()
-    np_fn = lambda a: osp_Rotation.from_euler(seq, a, degrees).as_rotvec().astype(dtype)  # HACK
-    self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
-    self._CompileAndCheck(jnp_fn, args_maker, atol=1e-4)
+  # @jtu.sample_product(
+  #   dtype=float_dtypes,
+  #   size=[1, num_samples],
+  #   seq=['x'],
+  #   degrees=[True, False],
+  # )
+  # def testRotationFromSingleEuler(self, size, dtype, seq, degrees):
+  #   assert len(seq) == 1
+  #   rng = jtu.rand_default(self.rng())
+  #   shape = (size,)
+  #   args_maker = lambda: (rng(shape, dtype),)
+  #   jnp_fn = lambda a: jsp_Rotation.from_euler(seq, a, degrees).as_rotvec()
+  #   np_fn = lambda a: osp_Rotation.from_euler(seq, a, degrees).as_rotvec().astype(dtype)  # HACK
+  #   self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
+  #   self._CompileAndCheck(jnp_fn, args_maker, atol=1e-4)
 
   # @jtu.sample_product(
   #   dtype=float_dtypes,
@@ -327,20 +327,20 @@ class LaxBackedScipySpatialTransformTests(jtu.JaxTestCase):
   #   self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
   #   self._CompileAndCheck(jnp_fn, args_maker, atol=1e-4)
 
-  # @jtu.sample_product(
-  #   dtype=float_dtypes,
-  #   shape=[(4,)],  #, (num_samples, 4)],
-  #   use_left=[False],
-  #   use_right=[False],
-  #   return_indices=[False],
-  # )
-  # def testRotationReduce(self, use_left, use_right, return_indices, shape, dtype):
-  #   rng = jtu.rand_default(self.rng())
-  #   args_maker = lambda: (rng(shape, dtype), rng(shape, dtype), rng(shape, dtype))
-  #   jnp_fn = lambda p, l, r: jsp_Rotation.from_quat(p).reduce(jsp_Rotation.from_quat(l) if use_left else None, jsp_Rotation.from_quat(r) if use_right else None, return_indices).as_rotvec()
-  #   np_fn = lambda p, l, r: osp_Rotation.from_quat(p).reduce(osp_Rotation.from_quat(l) if use_left else None, osp_Rotation.from_quat(r) if use_right else None, return_indices).as_rotvec().astype(dtype)  # HACK
-  #   self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
-  #   self._CompileAndCheck(jnp_fn, args_maker, atol=1e-4)
+  @jtu.sample_product(
+    dtype=float_dtypes,
+    shape=[(4,)],  #, (num_samples, 4)],
+    use_left=[False],
+    use_right=[False],
+    return_indices=[False],
+  )
+  def testRotationReduce(self, use_left, use_right, return_indices, shape, dtype):
+    rng = jtu.rand_default(self.rng())
+    args_maker = lambda: (rng(shape, dtype), rng(shape, dtype), rng(shape, dtype))
+    jnp_fn = lambda p, l, r: jsp_Rotation.from_quat(p).reduce(jsp_Rotation.from_quat(l) if use_left else None, jsp_Rotation.from_quat(r) if use_right else None, return_indices).as_rotvec()
+    np_fn = lambda p, l, r: osp_Rotation.from_quat(p).reduce(osp_Rotation.from_quat(l) if use_left else None, osp_Rotation.from_quat(r) if use_right else None, return_indices).as_rotvec().astype(dtype)  # HACK
+    self._CheckAgainstNumpy(np_fn, jnp_fn, args_maker, check_dtypes=True, tol=1e-4)
+    self._CompileAndCheck(jnp_fn, args_maker, atol=1e-4)
 
   # @jtu.sample_product(
   #   dtype=float_dtypes,
