@@ -220,18 +220,11 @@ class Rotation(typing.NamedTuple):
 
   def reduce(self, left=None, right=None, return_indices=False):
     """Reduce this rotation with the provided rotation groups."""
-    if left is None and right is None:
-      reduced = Rotation(jnp.atleast_2d(self.quat))
-      if return_indices:
-        return reduced, None, None
-      else:
-        return reduced
-    if right is None:
-      right = Rotation.identity()
-    if left is None:
-      left = Rotation.identity()
-    reduced_quat, left_best, right_best = _reduce(self.as_quat(), left.as_quat(), right.as_quat())
-    reduced = Rotation(reduced_quat)
+    p = self.as_quat()
+    l = (Rotation.identity(dtype=p.dtype) if left is None else left).as_quat()
+    r = (Rotation.identity(dtype=p.dtype) if right is None else right).as_quat()
+    reduced_quat, left_best, right_best = _reduce(p, l, r)
+    reduced = Rotation(jnp.atleast_2d(reduced_quat))
     if return_indices:
       if left is None:
         left_best = None
@@ -584,13 +577,13 @@ def _normalize_quaternion(quat: jax.Array) -> jax.Array:
 
 
 @functools.partial(jnp.vectorize, signature='(n),(n),(n)->(n),(),()')
-def _reduce(p: jax.Array, left: jax.Array, right: jax.Array):
-  e = jnp.zeros((3, 3, 3))
+def _reduce(p: jax.Array, l: jax.Array, r: jax.Array):
+  e = jnp.zeros((3, 3, 3), dtype=p.dtype)
   e = e.at[[0, 1, 2], [1, 2, 0], [2, 0, 1]].set(1)
   e = e.at[[0, 2, 1], [2, 1, 0], [1, 0, 2]].set(-1)
   ps, pv = _split_quaternion(p)
-  ls, lv = _split_quaternion(left)
-  rs, rv = _split_quaternion(right)
+  ls, lv = _split_quaternion(l)
+  rs, rv = _split_quaternion(r)
   qs = jnp.abs(jnp.einsum('i,j,k', ls, ps, rs) -
                jnp.einsum('i,jx,kx', ls, pv, rv) -
                jnp.einsum('ix,j,kx', lv, ps, rv) -
@@ -600,11 +593,11 @@ def _reduce(p: jax.Array, left: jax.Array, right: jax.Array):
   max_ind = jnp.argmax(jnp.reshape(qs, (len(qs), -1)), axis=1)
   left_best = max_ind // len(rv)
   right_best = max_ind % len(rv)
-  if left.ndim > 1:
-    left = left[left_best]
-  if right.ndim > 1:
-    right = right[right_best]
-  reduced = _compose_quat(left, _compose_quat(p, right))
+  if l.ndim > 1:
+    l = l[left_best]
+  if r.ndim > 1:
+    r = r[right_best]
+  reduced = _compose_quat(l, _compose_quat(p, r))
   if p.ndim == 1:
     reduced = p
     left_best = left_best[0]
