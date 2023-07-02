@@ -107,8 +107,11 @@ class Rotation(typing.NamedTuple):
       raise ValueError("Expected consecutive axes to be different, "
                        "got {}".format(seq))
     angles = jnp.atleast_1d(angles)
+    if len(seq) == 1 and angles.ndim == 1:
+      angles = angles[:, jnp.newaxis]
     axes = jnp.array([_elementary_basis_index(x) for x in seq.lower()])
-    return cls(_elementary_quat_compose(angles, axes, intrinsic, degrees))
+    quat = _elementary_quat_compose(angles, axes, intrinsic, degrees)
+    return cls(quat)
 
   @classmethod
   def from_matrix(cls, matrix: jax.Array):
