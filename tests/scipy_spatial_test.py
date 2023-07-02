@@ -304,7 +304,7 @@ class LaxBackedScipySpatialTransformTests(jtu.JaxTestCase):
   @jtu.sample_product(
     dtype=float_dtypes,
     shape=[(4,)],  #, (num_samples, 4)],
-    use_left=[False],
+    use_left=[False, True],
     use_right=[False],
     return_indices=[False],
   )

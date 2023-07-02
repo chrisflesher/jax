@@ -221,7 +221,7 @@ class Rotation(typing.NamedTuple):
   def reduce(self, left=None, right=None, return_indices=False):
     """Reduce this rotation with the provided rotation groups."""
     if left is None and right is None:
-      reduced = self.quat
+      reduced = Rotation(jnp.atleast_2d(self.quat))
       if return_indices:
         return reduced, None, None
       else:
@@ -230,7 +230,8 @@ class Rotation(typing.NamedTuple):
       right = Rotation.identity()
     if left is None:
       left = Rotation.identity()
-    reduced, left_best, right_best = _reduce(self.as_quat(), left.as_quat(), right.as_quat(), return_indices)
+    reduced_quat, left_best, right_best = _reduce(self.as_quat(), left.as_quat(), right.as_quat())
+    reduced = Rotation(reduced_quat)
     if return_indices:
       if left is None:
         left_best = None
@@ -582,8 +583,8 @@ def _normalize_quaternion(quat: jax.Array) -> jax.Array:
   return quat / _vector_norm(quat)
 
 
-@functools.partial(jnp.vectorize, signature='(n),(n),(n),()->(n),(),()')
-def _reduce(p: jax.Array, left: jax.Array, right: jax.Array, return_indices: bool):
+@functools.partial(jnp.vectorize, signature='(n),(n),(n)->(n),(),()')
+def _reduce(p: jax.Array, left: jax.Array, right: jax.Array):
   e = jnp.zeros((3, 3, 3))
   e = e.at[[0, 1, 2], [1, 2, 0], [2, 0, 1]].set(1)
   e = e.at[[0, 2, 1], [2, 1, 0], [1, 0, 2]].set(-1)
@@ -599,12 +600,12 @@ def _reduce(p: jax.Array, left: jax.Array, right: jax.Array, return_indices: boo
   max_ind = jnp.argmax(jnp.reshape(qs, (len(qs), -1)), axis=1)
   left_best = max_ind // len(rv)
   right_best = max_ind % len(rv)
-  if not left.single:
+  if left.ndim > 1:
     left = left[left_best]
-  if not right.single:
+  if right.ndim > 1:
     right = right[right_best]
-  reduced = left * p * right
-  if p.single:
+  reduced = _compose_quat(left, _compose_quat(p, right))
+  if p.ndim == 1:
     reduced = p
     left_best = left_best[0]
     right_best = right_best[0]
