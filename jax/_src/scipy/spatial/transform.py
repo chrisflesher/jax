@@ -138,10 +138,10 @@ class Rotation(typing.NamedTuple):
     return cls(quat)
 
   @classmethod
-  def random(cls, random_key: jax.Array, num: typing.Optional[int] = None):
+  def random(cls, random_key: jax.Array, num: typing.Optional[int] = None, dtype=float):
     """Generate uniformly distributed rotations."""
-    # Need to implement scipy.stats.special_ortho_group for this to work...
-    raise NotImplementedError
+    quat = _random_quaternion(random_key=random_key, num=num, dtype=dtype)
+    return cls(quat)
 
   def __getitem__(self, indexer):
     """Extract rotation(s) at given index(es) from object."""
@@ -223,8 +223,8 @@ class Rotation(typing.NamedTuple):
     p = self.as_quat()
     l = (Rotation.identity(dtype=p.dtype) if left is None else left).as_quat()
     r = (Rotation.identity(dtype=p.dtype) if right is None else right).as_quat()
-    reduced_quat, left_best, right_best = _reduce(p, l, r)
-    reduced = Rotation(jnp.atleast_2d(reduced_quat))
+    q, left_best, right_best = _reduce(p, l, r)
+    reduced = Rotation(jnp.atleast_2d(q))
     if return_indices:
       if left is None:
         left_best = None
@@ -574,6 +574,15 @@ def _make_elementary_quat(axis: int, angle: jax.Array) -> jax.Array:
 @functools.partial(jnp.vectorize, signature='(n)->(n)')
 def _normalize_quaternion(quat: jax.Array) -> jax.Array:
   return quat / _vector_norm(quat)
+
+
+@functools.partial(jax.jit, static_argnames=['num', 'dtype'])
+def _random_quaternion(random_key: jax.Array, num: typing.Optional[int], dtype):
+  if num is None:
+    sample = jax.random.normal(key=random_key, shape=(4,), dtype=dtype)
+  else:
+    sample = jax.random.normal(key=random_key, shape=(num, 4), dtype=dtype)
+  return _normalize_quaternion(sample)
 
 
 @functools.partial(jnp.vectorize, signature='(n),(n),(n)->(n),(),()')
