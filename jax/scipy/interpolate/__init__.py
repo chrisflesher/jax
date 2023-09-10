@@ -14,5 +14,8 @@
 
 # Already deprecate namespaces that will be removed in SciPy v2.0.0
 
+from jax._src.scipy.interpolate.ppoly import (
+    PPoly as PPoly)
+
 from jax._src.third_party.scipy.interpolate import (
     RegularGridInterpolator as RegularGridInterpolator)

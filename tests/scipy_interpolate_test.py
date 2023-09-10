@@ -31,6 +31,21 @@ class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
   """Tests for LAX-backed scipy.interpolate implementations"""
 
   @jtu.sample_product(
+    myarg=(1, 2),
+  )
+  def testPPoly(self, myarg):
+    pass
+    # rng = jtu.rand_default(self.rng())
+    # scipy_fun = lambda init_args, call_args: sp_interp.PPoly(
+    #     *init_args[:2], False, *init_args[2:])(*call_args)
+    # lax_fun = lambda init_args, call_args: jsp_interp.PPoly(
+    #     *init_args[:2], False, *init_args[2:])(*call_args)
+    # self._CheckAgainstNumpy(
+    #     scipy_fun, lax_fun, args_maker, check_dtypes=False, tol=1e-4)
+    # self._CompileAndCheck(lax_fun, args_maker, rtol={np.float64: 1e-14})
+
+
+  @jtu.sample_product(
     spaces=(((0., 10., 10),), ((-15., 20., 12), (3., 4., 24))),
     method=("linear", "nearest"),
   )
