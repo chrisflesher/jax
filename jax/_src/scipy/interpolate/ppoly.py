@@ -15,7 +15,7 @@
 import functools
 import typing
 
-import scipy.spatial.interpolate
+import scipy.interpolate
 
 import jax
 import jax.numpy as jnp
@@ -141,125 +141,125 @@ class PPoly(_PPolyBase):
     raise NotImplementedError
 
 
-@functools.partial(jnp.vectorize, signature='(k,m,n),(),(),(k),(k)->(r,n)')
-def _croots_poly1(c: jax.Array, y: float, ci: int, cj: int, wr: jax.Array, wi: jax.Array) -> jax.Array:
-  """Find all complex roots of a local polynomial."""
-  n = c.shape[0]
+# @functools.partial(jnp.vectorize, signature='(k,m,n),(),(),(k),(k)->(r,n)')
+# def _croots_poly1(c: jax.Array, y: float, ci: int, cj: int, wr: jax.Array, wi: jax.Array) -> jax.Array:
+#   """Find all complex roots of a local polynomial."""
+#   n = c.shape[0]
 
-  # Check actual polynomial order
-  for j in range(n):
-    if c[j,ci,cj] != 0:
-      order = n - 1 - j
-      break
-  else:
-    order = -1
+#   # Check actual polynomial order
+#   for j in range(n):
+#     if c[j,ci,cj] != 0:
+#       order = n - 1 - j
+#       break
+#   else:
+#     order = -1
 
-  if order < 0:
-    # Zero everywhere
-    if y == 0:
-      return -1
-    else:
-      return 0
-  elif order == 0:
-    # Nonzero constant polynomial: no roots
-    # (unless r.h.s. is exactly equal to the coefficient, that is.)
-    if c[n-1, ci, cj] == y:
-      return -1
-    else:
-      return 0
-  elif order == 1:
-    # Low-order polynomial: a0*x + a1
-    a0 = c[n-1-order,ci,cj]
-    a1 = c[n-1-order+1,ci,cj] - y
-    wr[0] = -a1 / a0
-    wi[0] = 0
-    return 1
-  elif order == 2:
-    # Low-order polynomial: a0*x**2 + a1*x + a2
-    a0 = c[n-1-order,ci,cj]
-    a1 = c[n-1-order+1,ci,cj]
-    a2 = c[n-1-order+2,ci,cj] - y
+#   if order < 0:
+#     # Zero everywhere
+#     if y == 0:
+#       return -1
+#     else:
+#       return 0
+#   elif order == 0:
+#     # Nonzero constant polynomial: no roots
+#     # (unless r.h.s. is exactly equal to the coefficient, that is.)
+#     if c[n-1, ci, cj] == y:
+#       return -1
+#     else:
+#       return 0
+#   elif order == 1:
+#     # Low-order polynomial: a0*x + a1
+#     a0 = c[n-1-order,ci,cj]
+#     a1 = c[n-1-order+1,ci,cj] - y
+#     wr[0] = -a1 / a0
+#     wi[0] = 0
+#     return 1
+#   elif order == 2:
+#     # Low-order polynomial: a0*x**2 + a1*x + a2
+#     a0 = c[n-1-order,ci,cj]
+#     a1 = c[n-1-order+1,ci,cj]
+#     a2 = c[n-1-order+2,ci,cj] - y
 
-    d = a1*a1 - 4*a0*a2
-    if d < 0:
-      # no real roots
-      d = libc.math.sqrt(-d)
-      wr[0] = -a1/(2*a0)
-      wi[0] = -d/(2*a0)
-      wr[1] = -a1/(2*a0)
-      wi[1] = d/(2*a0)
-      return 2
+#     d = a1*a1 - 4*a0*a2
+#     if d < 0:
+#       # no real roots
+#       d = libc.math.sqrt(-d)
+#       wr[0] = -a1/(2*a0)
+#       wi[0] = -d/(2*a0)
+#       wr[1] = -a1/(2*a0)
+#       wi[1] = d/(2*a0)
+#       return 2
 
-    d = libc.math.sqrt(d)
+#     d = libc.math.sqrt(d)
 
-    # avoid cancellation in subtractions
-    if d == 0:
-      wr[0] = -a1/(2*a0)
-      wi[0] = 0
-      wr[1] = -a1/(2*a0)
-      wi[1] = 0
-    elif a1 < 0:
-      wr[0] = (2*a2) / (-a1 + d) # == (-a1 - d)/(2*a0)
-      wi[0] = 0
-      wr[1] = (-a1 + d) / (2*a0)
-      wi[1] = 0
-    else:
-      wr[0] = (-a1 - d)/(2*a0)
-      wi[0] = 0
-      wr[1] = (2*a2) / (-a1 - d) # == (-a1 + d)/(2*a0)
-      wi[1] = 0
+#     # avoid cancellation in subtractions
+#     if d == 0:
+#       wr[0] = -a1/(2*a0)
+#       wi[0] = 0
+#       wr[1] = -a1/(2*a0)
+#       wi[1] = 0
+#     elif a1 < 0:
+#       wr[0] = (2*a2) / (-a1 + d) # == (-a1 - d)/(2*a0)
+#       wi[0] = 0
+#       wr[1] = (-a1 + d) / (2*a0)
+#       wi[1] = 0
+#     else:
+#       wr[0] = (-a1 - d)/(2*a0)
+#       wi[0] = 0
+#       wr[1] = (2*a2) / (-a1 - d) # == (-a1 + d)/(2*a0)
+#       wi[1] = 0
 
-    return 2
+#     return 2
 
-  # Compute required workspace and allocate it
-  lwork = 1 + 8*n
+#   # Compute required workspace and allocate it
+#   lwork = 1 + 8*n
 
-  if workspace[0] == NULL:
-    nworkspace = n*n + lwork
-    workspace[0] = libc.stdlib.malloc(nworkspace * sizeof(double))
-    if workspace[0] == NULL:
-      raise MemoryError("Failed to allocate memory in croots_poly1")
+#   if workspace[0] == NULL:
+#     nworkspace = n*n + lwork
+#     workspace[0] = libc.stdlib.malloc(nworkspace * sizeof(double))
+#     if workspace[0] == NULL:
+#       raise MemoryError("Failed to allocate memory in croots_poly1")
 
-  a = <double*>workspace[0]
-  work = a + n*n
+#   a = <double*>workspace[0]
+#   work = a + n*n
 
-  # Initialize the companion matrix, Fortran order
-  for j in range(order*order):
-    a[j] = 0
-  for j in range(order):
-    cc = c[n-1-j,ci,cj]
-    if j == 0:
-      cc -= y
-    a[j + (order-1)*order] = -cc / c[n-1-order,ci,cj]
-    if j + 1 < order:
-      a[j+1 + order*j] = 1
+#   # Initialize the companion matrix, Fortran order
+#   for j in range(order*order):
+#     a[j] = 0
+#   for j in range(order):
+#     cc = c[n-1-j,ci,cj]
+#     if j == 0:
+#       cc -= y
+#     a[j + (order-1)*order] = -cc / c[n-1-order,ci,cj]
+#     if j + 1 < order:
+#       a[j+1 + order*j] = 1
 
-  # Compute companion matrix eigenvalues
-  info = 0
-  dgeev("N", "N", &order, a, &order, <double*>wr, <double*>wi,
-      NULL, &order, NULL, &order, work, &lwork, &info)
-  if info != 0:
-    # Failure
-    return -2
+#   # Compute companion matrix eigenvalues
+#   info = 0
+#   dgeev("N", "N", &order, a, &order, <double*>wr, <double*>wi,
+#       NULL, &order, NULL, &order, work, &lwork, &info)
+#   if info != 0:
+#     # Failure
+#     return -2
 
-  # Sort roots (insertion sort)
-  for i in range(order):
-    br = wr[i]
-    bi = wi[i]
-    for j in range(i - 1, -1, -1):
-      if wr[j] > br:
-        wr[j+1] = wr[j]
-        wi[j+1] = wi[j]
-      else:
-        wr[j+1] = br
-        wi[j+1] = bi
-        break
-    else:
-      wr[0] = br
-      wi[0] = bi
+#   # Sort roots (insertion sort)
+#   for i in range(order):
+#     br = wr[i]
+#     bi = wi[i]
+#     for j in range(i - 1, -1, -1):
+#       if wr[j] > br:
+#         wr[j+1] = wr[j]
+#         wi[j+1] = wi[j]
+#       else:
+#         wr[j+1] = br
+#         wi[j+1] = bi
+#         break
+#     else:
+#       wr[0] = br
+#       wi[0] = bi
 
-  # Return with roots
-  return order
+#   # Return with roots
+#   return order
 
 
 @functools.partial(jnp.vectorize, signature='(k,m,n),(m+1),(),(),()->(n)')
@@ -288,30 +288,30 @@ def _evaluate(c: jax.Array,
   return out
 
 
-@functools.partial(jnp.vectorize, signature='(),(k,m,n),(),(),()->()')
-def _evaluate_poly1(s: jax.Array, c: jax.Array, ci: int, cj: int, dx: int) -> jax.Array:
-  """Evaluate polynomial, derivative, or antiderivative in a single interval."""
-  res = 0.0
-  z = jnp.where(dx >= 0, 1.0, z * s**(-dx))
-  for kp in range(c.shape[0]):
-    # prefactor of term after differentiation
-    if dx == 0:
-      prefactor = 1.0
-    elif dx > 0:
-      # derivative
-      if kp < dx:
-        continue
-      else:
-        prefactor = 1.0
-        for k in range(kp, kp - dx, -1):
-          prefactor *= k
-    else:
-      prefactor = 1.0
-      for k in range(kp, kp - dx):
-        prefactor /= k + 1
-    res = res + c[c.shape[0] - kp - 1, ci, cj] * z * prefactor
-    z = jnp.where(jnp.logical_and(kp < c.shape[0] - 1, kp >= dx), z * s, z)
-  return res
+# @functools.partial(jnp.vectorize, signature='(),(k,m,n),(),(),()->()')
+# def _evaluate_poly1(s: jax.Array, c: jax.Array, ci: int, cj: int, dx: int) -> jax.Array:
+#   """Evaluate polynomial, derivative, or antiderivative in a single interval."""
+#   res = 0.0
+#   z = jnp.where(dx >= 0, 1.0, z * s**(-dx))
+#   for kp in range(c.shape[0]):
+#     # prefactor of term after differentiation
+#     if dx == 0:
+#       prefactor = 1.0
+#     elif dx > 0:
+#       # derivative
+#       if kp < dx:
+#         continue
+#       else:
+#         prefactor = 1.0
+#         for k in range(kp, kp - dx, -1):
+#           prefactor *= k
+#     else:
+#       prefactor = 1.0
+#       for k in range(kp, kp - dx):
+#         prefactor /= k + 1
+#     res = res + c[c.shape[0] - kp - 1, ci, cj] * z * prefactor
+#     z = jnp.where(jnp.logical_and(kp < c.shape[0] - 1, kp >= dx), z * s, z)
+#   return res
 
 
 @functools.partial(jnp.vectorize, signature='(m),(),(),(),()->()')
@@ -342,105 +342,105 @@ def _find_interval_descending(x: jax.Array,
   return interval
 
 
-@functools.partial(jnp.vectorize, signature='(k,m,n),(m+1),(),(),()->()')
-def _real_roots(c: jax.Array, x: jax.Array, y: float, report_discont: bool, extrapolate: bool) -> jax.Array:
-  """Compute real roots of a real-valued piecewise polynomial function."""
-  if c.shape[1] != x.shape[0] - 1:
-    raise ValueError("x and c have incompatible shapes")
-  if c.shape[0] == 0:
-    return jnp.array([], dtype=float)
-  wr = <double*>libc.stdlib.malloc(c.shape[0] * sizeof(double))
-  wi = <double*>libc.stdlib.malloc(c.shape[0] * sizeof(double))
-  if not wr or not wi:
-    libc.stdlib.free(wr)
-    libc.stdlib.free(wi)
-    raise MemoryError("Failed to allocate memory in real_roots")
-  workspace = None
-  last_root = jnp.nan
-  ascending = x[x.shape[0] - 1] >= x[0]
-  roots = []
-  for jp in range(c.shape[2]):
-    cur_roots = []
-    for interval in range(c.shape[1]):
-      # Check for sign change across intervals
-      if interval > 0 and report_discont:
-        va = _evaluate_poly1(x=x[interval] - x[interval-1], c=c, ci=interval-1, cj=jp, dx=0) - y
-        vb = _evaluate_poly1(x=0, c=c, ci=interval, cj=jp, dx=0) - y
-        if (va < 0 and vb > 0) or (va > 0 and vb < 0):
-          # sign change between intervals
-          if x[interval] != last_root:
-            last_root = x[interval]
-            cur_roots.append(float(last_root))
+# @functools.partial(jnp.vectorize, signature='(k,m,n),(m+1),(),(),()->()')
+# def _real_roots(c: jax.Array, x: jax.Array, y: float, report_discont: bool, extrapolate: bool) -> jax.Array:
+#   """Compute real roots of a real-valued piecewise polynomial function."""
+#   if c.shape[1] != x.shape[0] - 1:
+#     raise ValueError("x and c have incompatible shapes")
+#   if c.shape[0] == 0:
+#     return jnp.array([], dtype=float)
+#   wr = <double*>libc.stdlib.malloc(c.shape[0] * sizeof(double))
+#   wi = <double*>libc.stdlib.malloc(c.shape[0] * sizeof(double))
+#   if not wr or not wi:
+#     libc.stdlib.free(wr)
+#     libc.stdlib.free(wi)
+#     raise MemoryError("Failed to allocate memory in real_roots")
+#   workspace = None
+#   last_root = jnp.nan
+#   ascending = x[x.shape[0] - 1] >= x[0]
+#   roots = []
+#   for jp in range(c.shape[2]):
+#     cur_roots = []
+#     for interval in range(c.shape[1]):
+#       # Check for sign change across intervals
+#       if interval > 0 and report_discont:
+#         va = _evaluate_poly1(x=x[interval] - x[interval-1], c=c, ci=interval-1, cj=jp, dx=0) - y
+#         vb = _evaluate_poly1(x=0, c=c, ci=interval, cj=jp, dx=0) - y
+#         if (va < 0 and vb > 0) or (va > 0 and vb < 0):
+#           # sign change between intervals
+#           if x[interval] != last_root:
+#             last_root = x[interval]
+#             cur_roots.append(float(last_root))
 
-      # Compute first the complex roots
-      k = _croots_poly1(c, y, interval, jp, wr, wi, &workspace)
+#       # Compute first the complex roots
+#       k = _croots_poly1(c, y, interval, jp, wr, wi, &workspace)
 
-      # Check for errors and identically zero values
-      if k == -1:
-        # Zero everywhere
-        if x[interval] == x[interval+1]:
-          # Only a point
-          if x[interval] != last_root:
-            last_root = x[interval]
-            cur_roots.append(x[interval])
-        else:
-          # A real interval
-          cur_roots.append(x[interval])
-          cur_roots.append(np.nan)
-          last_root = libc.math.NAN
-        continue
-      elif k < -1:
-        # An error occurred
-        raise RuntimeError("Internal error in root finding; please report this bug")
-      elif k == 0:
-        # No roots
-        continue
+#       # Check for errors and identically zero values
+#       if k == -1:
+#         # Zero everywhere
+#         if x[interval] == x[interval+1]:
+#           # Only a point
+#           if x[interval] != last_root:
+#             last_root = x[interval]
+#             cur_roots.append(x[interval])
+#         else:
+#           # A real interval
+#           cur_roots.append(x[interval])
+#           cur_roots.append(np.nan)
+#           last_root = libc.math.NAN
+#         continue
+#       elif k < -1:
+#         # An error occurred
+#         raise RuntimeError("Internal error in root finding; please report this bug")
+#       elif k == 0:
+#         # No roots
+#         continue
 
-      # Filter real roots
-      for i in range(k):
-        # Check real root
-        #
-        # The reality of a root is a decision that can be left to LAPACK,
-        # which has to determine this in any case.
-        if wi[i] != 0:
-          continue
+#       # Filter real roots
+#       for i in range(k):
+#         # Check real root
+#         #
+#         # The reality of a root is a decision that can be left to LAPACK,
+#         # which has to determine this in any case.
+#         if wi[i] != 0:
+#           continue
 
-        # Refine root by one Newton iteration
-        f = _evaluate_poly1(wr[i], c, interval, jp, 0) - y
-        df = _evaluate_poly1(wr[i], c, interval, jp, 1)
-        if df != 0:
-          dx = f/df
-          if abs(dx) < abs(wr[i]):
-            wr[i] = wr[i] - dx
+#         # Refine root by one Newton iteration
+#         f = _evaluate_poly1(wr[i], c, interval, jp, 0) - y
+#         df = _evaluate_poly1(wr[i], c, interval, jp, 1)
+#         if df != 0:
+#           dx = f/df
+#           if abs(dx) < abs(wr[i]):
+#             wr[i] = wr[i] - dx
 
-        # Check interval
-        wr[i] += x[interval]
-        if interval == 0 and extrapolate:
-          # Half-open to the left/right.
-          # Might also be the only interval, in which case there is
-          # no limitation.
-          if (interval != c.shape[1] - 1 and
-            (ascending and not wr[i] <= x[interval+1] or
-             not ascending and not wr[i] >= x[interval + 1])):
-              continue
-        elif interval == c.shape[1] - 1 and extrapolate:
-          # Half-open to the right/left.
-          if (ascending and not wr[i] >= x[interval] or
-            not ascending and not wr[i] <= x[interval]):
-              continue
-        else:
-          if (ascending and
-            not x[interval] <= wr[i] <= x[interval+1] or
-            not ascending and
-            not x[interval + 1] <= wr[i] <= x[interval]):
-              continue
+#         # Check interval
+#         wr[i] += x[interval]
+#         if interval == 0 and extrapolate:
+#           # Half-open to the left/right.
+#           # Might also be the only interval, in which case there is
+#           # no limitation.
+#           if (interval != c.shape[1] - 1 and
+#             (ascending and not wr[i] <= x[interval+1] or
+#              not ascending and not wr[i] >= x[interval + 1])):
+#               continue
+#         elif interval == c.shape[1] - 1 and extrapolate:
+#           # Half-open to the right/left.
+#           if (ascending and not wr[i] >= x[interval] or
+#             not ascending and not wr[i] <= x[interval]):
+#               continue
+#         else:
+#           if (ascending and
+#             not x[interval] <= wr[i] <= x[interval+1] or
+#             not ascending and
+#             not x[interval + 1] <= wr[i] <= x[interval]):
+#               continue
 
-        # Add to list
-        if wr[i] != last_root:
-          last_root = wr[i]
-          cur_roots.append(float(last_root))
+#         # Add to list
+#         if wr[i] != last_root:
+#           last_root = wr[i]
+#           cur_roots.append(float(last_root))
 
-      # Construct roots
-      roots.append(np.array(cur_roots, dtype=float))
+#       # Construct roots
+#       roots.append(np.array(cur_roots, dtype=float))
 
-  return roots
+#   return roots
