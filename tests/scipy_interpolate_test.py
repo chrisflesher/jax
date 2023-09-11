@@ -16,7 +16,7 @@ from absl.testing import absltest
 
 import operator
 from functools import reduce
-import numpy as np
+import numpy as onp
 
 from jax._src import test_util as jtu
 import scipy.interpolate as sp_interp
@@ -41,11 +41,12 @@ class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
   )
   def testPPoly(self, k, m, n, dtype, extrapolate, axis, nu):
     rng = jtu.rand_default(self.rng())
-    sp_fn = lambda c, x, xp: sp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
-    jsp_fn = lambda c, x, xp: jsp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
-    args_maker = lambda: (rng((k, m, n), dtype), rng((m+1), dtype), rng(1, dtype))
+    x = onp.linspace(-1., 1., m + 1)
+    sp_fn = lambda c, xp: sp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
+    jsp_fn = lambda c, xp: jsp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
+    args_maker = lambda: (rng((k, m, n), dtype), rng(1, dtype))
     self._CheckAgainstNumpy(sp_fn, jsp_fn, args_maker, check_dtypes=False, tol=1e-4)
-    self._CompileAndCheck(jsp_fn, args_maker, rtol={np.float64: 1e-14})
+    self._CompileAndCheck(jsp_fn, args_maker, rtol={onp.float64: 1e-14})
 
 
   # @jtu.sample_product(

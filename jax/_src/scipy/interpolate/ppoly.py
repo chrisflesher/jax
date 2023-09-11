@@ -19,6 +19,7 @@ import scipy.interpolate
 
 import jax
 import jax.numpy as jnp
+import numpy as onp
 from jax._src.numpy.util import _wraps
 
 
@@ -70,13 +71,12 @@ class _PPolyBase(typing.NamedTuple):
     if extrapolate == 'periodic':
       x = self.x[0] + (x - self.x[0]) % (self.x[-1] - self.x[0])
       extrapolate = False
-    c = self.c.reshape(self.c.shape[0], self.c.shape[1], -1)
-    out = _evaluate(c, self.x, x, nu, extrapolate)
-    out = out.reshape(x.shape + self.c.shape[2:])
-    if self.axis != 0:
-      l = list(range(out.ndim))
-      l = l[x.ndim:x.ndim+self.axis] + l[:x.ndim] + l[x.ndim+self.axis:]
-      out = out.transpose(l)
+    out = _evaluate(jnp.roll(self.c, -2), self.x, x, nu, extrapolate)
+    # out = out.reshape(x.shape + self.c.shape[2:])
+    # if self.axis != 0:
+    #   l = list(range(out.ndim))
+    #   l = l[x.ndim:x.ndim+self.axis] + l[:x.ndim] + l[x.ndim+self.axis:]
+    #   out = out.transpose(l)
     return out
 
 
@@ -115,7 +115,7 @@ class PPoly(_PPolyBase):
     raise NotImplementedError
 
 
-@functools.partial(jnp.vectorize, signature='(k,m,n),(m1),(),(),()->(n)')
+@functools.partial(jnp.vectorize, signature='(k,m),(m1),(),(),()->()')
 def _evaluate(c: jax.Array,
               x: jax.Array,
               xval: jax.Array,
@@ -128,23 +128,17 @@ def _evaluate(c: jax.Array,
   if c.shape[1] != x.shape[0] - 1:
     raise ValueError("x and c have incompatible shapes")
   ascending = x[x.shape[0] - 1] >= x[0]
-  i_ascending = _find_interval_ascending(x[0], x.shape[0], xval, extrapolate)
-  i_descending = _find_interval_descending(x[0], x.shape[0], xval, extrapolate)
+  i_ascending = _find_interval_ascending(x, xval, extrapolate)
+  i_descending = _find_interval_descending(x, xval, extrapolate)
   i = jnp.where(ascending, i_ascending, i_descending)
   interval = jnp.where(i < 0, 0, i)
-  out = _evaluate_poly1(
-    s=xval - x[interval],
-    c=c,
-    ci=interval,
-    cj=jnp.arange(c.shape[2]),
-    dx=dx)
+  out = _evaluate_poly1(xval - x[interval], c, interval, dx)
   return out
 
 
-@functools.partial(jnp.vectorize, signature='(),(k,m,n),(),(),()->()')
-def _evaluate_poly1(s: jax.Array, c: jax.Array, ci: int, dx: int) -> jax.Array:
+@functools.partial(jnp.vectorize, signature='(),(k,m),(),()->()')
+def _evaluate_poly1(s: jax.Array, c: jax.Array, i: int, dx: int) -> jax.Array:
   """Evaluate polynomial, derivative, or antiderivative in a single interval."""
-  res = 0.0
   k = jnp.arange(c.shape[0])
   if dx == 0:
     prefactor = jnp.ones(c.shape[0], s.dtype)
@@ -153,33 +147,31 @@ def _evaluate_poly1(s: jax.Array, c: jax.Array, ci: int, dx: int) -> jax.Array:
     raise NotImplementedError
   else:
     raise NotImplementedError
-  res = jnp.sum(c[c.shape[0] - k - 1, ci] * z * prefactor)
+  res = jnp.sum(c[c.shape[0] - k - 1, i] * z * prefactor)
   return res
 
 
-@functools.partial(jnp.vectorize, signature='(m1),(),(),(),()->()')
+@functools.partial(jnp.vectorize, signature='(m1),(),()->()')
 def _find_interval_ascending(x: jax.Array,
-                             nx: int,
                              xval: jax.Array,
-                             extrapolate: bool = True,
+                             extrapolate: bool,
                              ) -> int:
   """Find an interval such that x[interval] <= xval < x[interval+1]."""
-  in_bounds = jnp.logical_and(x[0] <= xval, xval <= x[nx - 1])
+  in_bounds = jnp.logical_and(x[0] <= xval, xval <= x[x.size - 1])
   interval = jnp.searchsorted(x, xval, side='right')
-  interval = jnp.clip(interval, 0, nx - 2)
+  interval = jnp.clip(interval, 0, x.size - 2)
   interval = jnp.where(jnp.logical_or(in_bounds, extrapolate), interval, -1)
   return interval
 
 
-@functools.partial(jnp.vectorize, signature='(m1),(),(),(),()->()')
+@functools.partial(jnp.vectorize, signature='(m1),(),()->()')
 def _find_interval_descending(x: jax.Array,
-                              nx: int,
                               xval: jax.Array,
-                              extrapolate: bool = True,
+                              extrapolate: bool,
                               ) -> int:
   """Find an interval such that x[interval + 1] < xval <= x[interval]."""
-  in_bounds = jnp.logical_and(x[nx - 1] <= xval, xval <= x[0])
-  interval = x.size - jnp.searchsorted(x, xval, side='right', sorter=jnp.arange(x.size)[::-1])
-  interval = jnp.clip(interval, 0, nx - 2)
+  in_bounds = jnp.logical_and(x[x.size - 1] <= xval, xval <= x[0])
+  interval = x.size - jnp.searchsorted(x[::-1], xval, side='right')
+  interval = jnp.clip(interval, 0, x.size - 2)
   interval = jnp.where(jnp.logical_or(in_bounds, extrapolate), interval, -1)
   return interval
