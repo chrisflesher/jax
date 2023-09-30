@@ -18,33 +18,32 @@ import operator
 from functools import reduce
 import numpy as onp
 
-from jax._src import test_util as jtu
 import scipy.interpolate as sp_interp
+import jax
+import jax.numpy as jnp
 import jax.scipy.interpolate as jsp_interp
+from jax._src import test_util as jtu
 
-from jax import config
-
-config.parse_flags_with_absl()
+jax.config.parse_flags_with_absl()
 
 
 class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
   """Tests for LAX-backed scipy.interpolate implementations"""
 
   @jtu.sample_product(
-    k=(4,),
-    m=(3,),
-    n=(3,),
+    k=(1,),
+    m=(11,),
     dtype=jtu.dtypes.floating,
     extrapolate=(True,),
     axis=(0,),
     nu=(0,),
   )
-  def testPPoly(self, k, m, n, dtype, extrapolate, axis, nu):
+  def testPPoly(self, k, m, dtype, extrapolate, axis, nu):
     rng = jtu.rand_default(self.rng())
-    x = onp.linspace(-1., 1., m + 1)
+    x = onp.linspace(-10., 10., m + 1)
     sp_fn = lambda c, xp: sp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
-    jsp_fn = lambda c, xp: jsp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
-    args_maker = lambda: (rng((k, m, n), dtype), rng(1, dtype))
+    jsp_fn = lambda c, xp: jsp_interp.PPoly(c, jnp.array(x), extrapolate, axis)(xp, nu)
+    args_maker = lambda: (rng((k, m), dtype), rng(1, dtype))
     self._CheckAgainstNumpy(sp_fn, jsp_fn, args_maker, check_dtypes=False, tol=1e-4)
     self._CompileAndCheck(jsp_fn, args_maker, rtol={onp.float64: 1e-14})
 

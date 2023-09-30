@@ -71,7 +71,7 @@ class _PPolyBase(typing.NamedTuple):
     if extrapolate == 'periodic':
       x = self.x[0] + (x - self.x[0]) % (self.x[-1] - self.x[0])
       extrapolate = False
-    out = _evaluate(jnp.roll(self.c, -2), self.x, x, nu, extrapolate)
+    out = _evaluate(jnp.rollaxis(self.c, -2), self.x, x, nu, extrapolate)
     # out = out.reshape(x.shape + self.c.shape[2:])
     # if self.axis != 0:
     #   l = list(range(out.ndim))
@@ -115,7 +115,7 @@ class PPoly(_PPolyBase):
     raise NotImplementedError
 
 
-@functools.partial(jnp.vectorize, signature='(k,m),(m1),(),(),()->()')
+# @functools.partial(jnp.vectorize, signature='(k,m),(m1),(),(),()->()')
 def _evaluate(c: jax.Array,
               x: jax.Array,
               xval: jax.Array,
@@ -132,6 +132,7 @@ def _evaluate(c: jax.Array,
   i_descending = _find_interval_descending(x, xval, extrapolate)
   i = jnp.where(ascending, i_ascending, i_descending)
   interval = jnp.where(i < 0, 0, i)
+  import pdb; pdb.set_trace()
   out = _evaluate_poly1(xval - x[interval], c, interval, dx)
   return out
 
@@ -158,7 +159,7 @@ def _find_interval_ascending(x: jax.Array,
                              ) -> int:
   """Find an interval such that x[interval] <= xval < x[interval+1]."""
   in_bounds = jnp.logical_and(x[0] <= xval, xval <= x[x.size - 1])
-  interval = jnp.searchsorted(x, xval, side='right')
+  interval = jnp.searchsorted(x, xval, side='right') - 1
   interval = jnp.clip(interval, 0, x.size - 2)
   interval = jnp.where(jnp.logical_or(in_bounds, extrapolate), interval, -1)
   return interval
@@ -171,7 +172,7 @@ def _find_interval_descending(x: jax.Array,
                               ) -> int:
   """Find an interval such that x[interval + 1] < xval <= x[interval]."""
   in_bounds = jnp.logical_and(x[x.size - 1] <= xval, xval <= x[0])
-  interval = x.size - jnp.searchsorted(x[::-1], xval, side='right')
+  interval = x.size - jnp.searchsorted(x[::-1], xval, side='right') - 1
   interval = jnp.clip(interval, 0, x.size - 2)
   interval = jnp.where(jnp.logical_or(in_bounds, extrapolate), interval, -1)
   return interval
