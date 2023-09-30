@@ -55,7 +55,8 @@ class _PPolyBase:
     self.extrapolate = extrapolate
     self.axis = axis
 
-  def extend(self, c: jax.Array, x):
+  def extend(self, c: jax.Array, x: jax.Array):
+    """Add additional breakpoints and coefficients to the polynomial."""
     raise NotImplementedError
 
   def __call__(self, x: jax.Array, nu: int = 0, extrapolate: typing.Optional[bool] = None):
@@ -65,6 +66,8 @@ class _PPolyBase:
     if extrapolate == 'periodic':
       x = self.x[0] + (x - self.x[0]) % (self.x[-1] - self.x[0])
       extrapolate = False
+    if nu < 0:
+      raise ValueError("Order of derivative cannot be negative")
     out = _evaluate(jnp.rollaxis(self.c, -2), self.x, x, nu, extrapolate)
     # out = out.reshape(x.shape + self.c.shape[2:])
     # if self.axis != 0:
@@ -116,7 +119,7 @@ class PPoly(_PPolyBase):
     raise NotImplementedError
 
 
-# @functools.partial(jnp.vectorize, signature='(k,m),(m1),(),(),()->()')
+@functools.partial(jnp.vectorize, signature='(k,m),(m1),(n),(),()->(n)')
 def _evaluate(c: jax.Array,
               x: jax.Array,
               xval: jax.Array,
@@ -124,8 +127,6 @@ def _evaluate(c: jax.Array,
               extrapolate: bool,
               ) -> jax.Array:
   """Evaluate a piecewise polynomial."""
-  if dx < 0:
-    raise ValueError("Order of derivative cannot be negative")
   if c.shape[1] != x.shape[0] - 1:
     raise ValueError("x and c have incompatible shapes")
   ascending = x[x.shape[0] - 1] >= x[0]
