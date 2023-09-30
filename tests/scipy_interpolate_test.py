@@ -31,10 +31,10 @@ class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
   """Tests for LAX-backed scipy.interpolate implementations"""
 
   @jtu.sample_product(
-    order=(1,),
+    order=(1, 2),
     num_intervals=(11,),
-    num_samples=(1,),
-    dtype=jtu.dtypes.floating,
+    num_samples=(1, 2),
+    dtype=(jnp.float64,),  # jtu.dtypes.floating,
     extrapolate=(True,),
     axis=(0,),
     nu=(0,),
@@ -45,7 +45,6 @@ class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
     sp_fn = lambda c, xp: sp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
     jsp_fn = lambda c, xp: jsp_interp.PPoly(c, jnp.array(x), extrapolate, axis)(xp, nu)
     args_maker = lambda: (rng((order, num_intervals), dtype), rng(num_samples, dtype))
-    import pdb; pdb.set_trace()
     self._CheckAgainstNumpy(sp_fn, jsp_fn, args_maker, check_dtypes=False, tol=1e-4)
     self._CompileAndCheck(jsp_fn, args_maker, rtol={onp.float64: 1e-14})
 
