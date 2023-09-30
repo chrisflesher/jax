@@ -132,7 +132,6 @@ def _evaluate(c: jax.Array,
   i_descending = _find_interval_descending(x, xval, extrapolate)
   i = jnp.where(ascending, i_ascending, i_descending)
   interval = jnp.where(i < 0, 0, i)
-  import pdb; pdb.set_trace()
   out = _evaluate_poly1(xval - x[interval], c, interval, dx)
   return out
 
@@ -140,16 +139,14 @@ def _evaluate(c: jax.Array,
 @functools.partial(jnp.vectorize, signature='(),(k,m),(),()->()')
 def _evaluate_poly1(s: jax.Array, c: jax.Array, i: int, dx: int) -> jax.Array:
   """Evaluate polynomial, derivative, or antiderivative in a single interval."""
-  k = jnp.arange(c.shape[0])
-  if dx == 0:
-    prefactor = jnp.ones(c.shape[0], s.dtype)
-    z = jnp.cumprod(s)
-  elif dx > 0:
-    raise NotImplementedError
-  else:
-    raise NotImplementedError
-  res = jnp.sum(c[c.shape[0] - k - 1, i] * z * prefactor)
-  return res
+  k = c.shape[0]
+  # if dx == 0:
+  #   pass
+  # else:
+  #   raise NotImplementedError
+  m = jnp.arange(k)
+  result = jnp.sum(c[m, i] * s**(k-m-1).astype(s.dtype))
+  return result
 
 
 @functools.partial(jnp.vectorize, signature='(m1),(),()->()')
