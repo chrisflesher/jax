@@ -71,36 +71,36 @@ class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
     self._CheckAgainstNumpy(sp_fn, jsp_fn, args_maker, check_dtypes=False, tol=1e-4)
     self._CompileAndCheck(jsp_fn, args_maker, rtol={onp.float64: 1e-14})
 
-  # @jtu.sample_product(
-  #   spaces=(((0., 10., 10),), ((-15., 20., 12), (3., 4., 24))),
-  #   method=("linear", "nearest"),
-  # )
-  # def testRegularGridInterpolator(self, spaces, method):
-  #   rng = jtu.rand_default(self.rng())
-  #   scipy_fun = lambda init_args, call_args: sp_interp.RegularGridInterpolator(
-  #       *init_args[:2], method, False, *init_args[2:])(*call_args)
-  #   lax_fun = lambda init_args, call_args: jsp_interp.RegularGridInterpolator(
-  #       *init_args[:2], method, False, *init_args[2:])(*call_args)
+  @jtu.sample_product(
+    spaces=(((0., 10., 10),), ((-15., 20., 12), (3., 4., 24))),
+    method=("linear", "nearest"),
+  )
+  def testRegularGridInterpolator(self, spaces, method):
+    rng = jtu.rand_default(self.rng())
+    scipy_fun = lambda init_args, call_args: sp_interp.RegularGridInterpolator(
+        *init_args[:2], method, False, *init_args[2:])(*call_args)
+    lax_fun = lambda init_args, call_args: jsp_interp.RegularGridInterpolator(
+        *init_args[:2], method, False, *init_args[2:])(*call_args)
 
-  #   def args_maker():
-  #     points = tuple(map(lambda x: np.linspace(*x), spaces))
-  #     values = rng(reduce(operator.add, tuple(map(np.shape, points))), float)
-  #     fill_value = np.nan
+    def args_maker():
+      points = tuple(map(lambda x: onp.linspace(*x), spaces))
+      values = rng(reduce(operator.add, tuple(map(onp.shape, points))), float)
+      fill_value = onp.nan
 
-  #     init_args = (points, values, fill_value)
-  #     n_validation_points = 50
-  #     valid_points = tuple(
-  #         map(
-  #             lambda x: np.linspace(x[0] - 0.2 * (x[1] - x[0]), x[1] + 0.2 *
-  #                                   (x[1] - x[0]), n_validation_points),
-  #             spaces))
-  #     valid_points = np.squeeze(np.stack(valid_points, axis=1))
-  #     call_args = (valid_points,)
-  #     return init_args, call_args
+      init_args = (points, values, fill_value)
+      n_validation_points = 50
+      valid_points = tuple(
+          map(
+              lambda x: onp.linspace(x[0] - 0.2 * (x[1] - x[0]), x[1] + 0.2 *
+                                     (x[1] - x[0]), n_validation_points),
+              spaces))
+      valid_points = onp.squeeze(onp.stack(valid_points, axis=1))
+      call_args = (valid_points,)
+      return init_args, call_args
 
-  #   self._CheckAgainstNumpy(
-  #       scipy_fun, lax_fun, args_maker, check_dtypes=False, tol=1e-4)
-  #   self._CompileAndCheck(lax_fun, args_maker, rtol={np.float64: 1e-14})
+    self._CheckAgainstNumpy(
+        scipy_fun, lax_fun, args_maker, check_dtypes=False, tol=1e-4)
+    self._CompileAndCheck(lax_fun, args_maker, rtol={onp.float64: 1e-14})
 
 
 if __name__ == "__main__":
