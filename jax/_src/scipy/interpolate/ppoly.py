@@ -66,6 +66,8 @@ class _PPolyBase:
     if extrapolate == 'periodic':
       x = self.x[0] + (x - self.x[0]) % (self.x[-1] - self.x[0])
       extrapolate = False
+    if nu != 0:
+      raise NotImplementedError
     if nu < 0:
       raise ValueError("Order of derivative cannot be negative")
     out = _evaluate(jnp.rollaxis(self.c, -2), self.x, x, nu, extrapolate)
@@ -142,12 +144,8 @@ def _evaluate(c: jax.Array,
 def _evaluate_poly1(s: jax.Array, c: jax.Array, i: int, dx: int) -> jax.Array:
   """Evaluate polynomial, derivative, or antiderivative in a single interval."""
   k = c.shape[0]
-  # if dx == 0:
-  #   pass
-  # else:
-  #   raise NotImplementedError
   m = jnp.arange(k)
-  result = jnp.sum(c[m, i] * s**(k-m-1).astype(s.dtype))
+  result = jnp.sum(c[m, i] * s**(k-m-1).astype(s.dtype))  # why is astype needed here?
   return result
 
 
