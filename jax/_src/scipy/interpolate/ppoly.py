@@ -19,7 +19,6 @@ import scipy.interpolate
 
 import jax
 import jax.numpy as jnp
-import numpy as onp
 from jax._src.numpy.util import _wraps
 
 
@@ -48,9 +47,9 @@ class _PPolyBase:
       raise ValueError("polynomial must be at least of order 0")
     if c.shape[1] != x.size-1:
       raise ValueError("number of coefficients != len(x)-1")
-    dx = jnp.diff(x)
-    if not (jnp.all(dx >= 0) or jnp.all(dx <= 0)):
-      raise ValueError("`x` must be strictly increasing or decreasing.")
+    # dx = jnp.diff(x)
+    # if not (jnp.all(dx >= 0) or jnp.all(dx <= 0)):  # TracerBoolConversionError
+    #   raise ValueError("`x` must be strictly increasing or decreasing.")
     self.c = c
     self.x = x
     self.extrapolate = extrapolate
@@ -73,6 +72,13 @@ class _PPolyBase:
     #   l = l[x.ndim:x.ndim+self.axis] + l[:x.ndim] + l[x.ndim+self.axis:]
     #   out = out.transpose(l)
     return out
+
+
+jax.tree_util.register_pytree_node(
+    _PPolyBase,
+    lambda obj: ((obj.c, obj.x), (obj.extrapolate, obj.axis)),
+    lambda aux, children: PPoly(*children, *aux),
+)
 
 
 @_wraps(scipy.interpolate.PPoly)
@@ -108,13 +114,6 @@ class PPoly(_PPolyBase):
   def from_bernstein_basis(cls, bp, extrapolate=None):
     """Construct a polynomial in the power basis from the Bernstein basis."""
     raise NotImplementedError
-
-
-jax.tree_util.register_pytree_node(
-    PPoly,
-    lambda obj: ((obj.c, obj.x), (obj.extrapolate, obj.axis)),
-    lambda aux, children: PPoly(*children, *aux),
-)
 
 
 # @functools.partial(jnp.vectorize, signature='(k,m),(m1),(),(),()->()')

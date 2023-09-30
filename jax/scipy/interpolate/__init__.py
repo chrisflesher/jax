@@ -14,6 +14,10 @@
 
 # Already deprecate namespaces that will be removed in SciPy v2.0.0
 
+
+from jax._src.scipy.interpolate.cubic import (
+    CubicHermiteSpline as CubicHermiteSpline)
+
 from jax._src.scipy.interpolate.ppoly import (
     PPoly as PPoly)
 

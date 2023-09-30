@@ -17,28 +17,29 @@ import typing
 
 import jax
 import jax.numpy as jnp
-import scipy.spatial.interpolate
+import scipy.interpolate
 from jax._src.numpy.util import _wraps
 
-from . import PPoly
+from jax._src.scipy.interpolate.ppoly import PPoly
 
 
 @_wraps(scipy.interpolate.CubicHermiteSpline)
 class CubicHermiteSpline(PPoly):
   """Piecewise-cubic interpolator matching values and first derivatives."""
 
-  axis: int
-
-  def __init__(cls, x: jax.Array, y: jax.Array, dydx: jax.Array, axis: int = 0, extrapolate: typing.Optional[bool] = None):
+  def __init__(self, x: jax.Array, y: jax.Array, dydx: jax.Array, axis: int = 0, extrapolate: typing.Optional[bool] = None):
     if extrapolate is None:
       extrapolate = True
     x, dx, y, axis, dydx = _prepare_input(x, y, axis, dydx)
     dxr = dx.reshape([dx.shape[0]] + [1] * (y.ndim - 1))
     slope = jnp.diff(y, axis=0) / dxr
     t = (dydx[:-1] + dydx[1:] - 2 * slope) / dxr
-    c = jnp.vstack((t / dxr, (slope - dydx[:-1]) / dxr - t, dydx[:-1], y[:-1]))
-    super.__init__(c, x, extrapolate=extrapolate)
-    self.axis = axis
+    c = jnp.empty((4, len(x) - 1) + y.shape[1:], dtype=t.dtype)
+    c = c.at[0].set(t / dxr)
+    c = c.at[1].set((slope - dydx[:-1]) / dxr - t)
+    c = c.at[2].set(dydx[:-1])
+    c = c.at[3].set(y[:-1])
+    super().__init__(c, x, extrapolate=extrapolate, axis=axis)
 
 
 def _prepare_input(x: jax.Array, y: jax.Array, axis: int, dydx: typing.Optional[jax.Array] = None):
@@ -55,7 +56,7 @@ def _prepare_input(x: jax.Array, y: jax.Array, axis: int, dydx: typing.Optional[
       raise ValueError("The shapes of `y` and `dydx` must be identical.")
     if jnp.issubdtype(dydx.dtype, jnp.complexfloating):
       dtype = complex
-    dydx = dydx.astype(dtype, copy=False)
+    dydx = dydx.astype(dtype)
   y = y.astype(dtype, copy=False)
   axis = axis % y.ndim
   if x.ndim != 1:
