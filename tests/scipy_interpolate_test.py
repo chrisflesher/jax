@@ -26,14 +26,16 @@ from jax._src import test_util as jtu
 
 jax.config.parse_flags_with_absl()
 
+NUM_SAMPLES = 2
+
 
 class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
   """Tests for LAX-backed scipy.interpolate implementations"""
 
   @jtu.sample_product(
-    order=(1, 2),
+    order=(1, 2, 3),
     num_intervals=(11,),
-    num_samples=(1, 2),
+    num_samples=(1, NUM_SAMPLES),
     dtype=jtu.dtypes.floating,
     extrapolate=(True,),
     axis=(0,),

@@ -23,14 +23,10 @@ import numpy as onp
 from jax._src.numpy.util import _wraps
 
 
-class _PPolyBase(typing.NamedTuple):
-  c: jax.Array
-  x: jax.Array
-  extrapolate: bool
-  axis: int
+class _PPolyBase:
 
   @classmethod
-  def init(cls, c: jax.Array, x: jax.Array, extrapolate: typing.Optional[bool] = None, axis: int = 0):
+  def __init__(self, c: jax.Array, x: jax.Array, extrapolate: typing.Optional[bool] = None, axis: int = 0):
     if extrapolate is None:
       extrapolate = True
     elif extrapolate != 'periodic':
@@ -55,11 +51,10 @@ class _PPolyBase(typing.NamedTuple):
     dx = jnp.diff(x)
     if not (jnp.all(dx >= 0) or jnp.all(dx <= 0)):
       raise ValueError("`x` must be strictly increasing or decreasing.")
-    return cls(
-      c=c,
-      x=x,
-      extrapolate=extrapolate,
-      axis=axis)
+    self.c = c
+    self.x = x
+    self.extrapolate = extrapolate
+    self.axis = axis
 
   def extend(self, c: jax.Array, x):
     raise NotImplementedError
@@ -113,6 +108,13 @@ class PPoly(_PPolyBase):
   def from_bernstein_basis(cls, bp, extrapolate=None):
     """Construct a polynomial in the power basis from the Bernstein basis."""
     raise NotImplementedError
+
+
+jax.tree_util.register_pytree_node(
+    PPoly,
+    lambda obj: ((obj.c, obj.x), (obj.extrapolate, obj.axis)),
+    lambda aux, children: PPoly(*children, *aux),
+)
 
 
 # @functools.partial(jnp.vectorize, signature='(k,m),(m1),(),(),()->()')

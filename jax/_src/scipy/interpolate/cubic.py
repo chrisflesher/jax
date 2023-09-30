@@ -29,20 +29,15 @@ class CubicHermiteSpline(PPoly):
 
   axis: int
 
-  @classmethod
-  def init(cls, x: jax.Array, y: jax.Array, dydx: jax.Array, axis: int = 0, extrapolate: typing.Optional[bool] = None):
+  def __init__(cls, x: jax.Array, y: jax.Array, dydx: jax.Array, axis: int = 0, extrapolate: typing.Optional[bool] = None):
     if extrapolate is None:
       extrapolate = True
     x, dx, y, axis, dydx = _prepare_input(x, y, axis, dydx)
     dxr = dx.reshape([dx.shape[0]] + [1] * (y.ndim - 1))
     slope = jnp.diff(y, axis=0) / dxr
     t = (dydx[:-1] + dydx[1:] - 2 * slope) / dxr
-    c = jnp.empty((4, len(x) - 1) + y.shape[1:], dtype=t.dtype)
-    c[0] = t / dxr
-    c[1] = (slope - dydx[:-1]) / dxr - t
-    c[2] = dydx[:-1]
-    c[3] = y[:-1]
-    super().init(c, x, extrapolate=extrapolate)
+    c = jnp.vstack((t / dxr, (slope - dydx[:-1]) / dxr - t, dydx[:-1], y[:-1]))
+    super.__init__(c, x, extrapolate=extrapolate)
     self.axis = axis
 
 
