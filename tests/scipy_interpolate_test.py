@@ -34,14 +34,14 @@ class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
     order=(1, 2),
     num_intervals=(11,),
     num_samples=(1, 2),
-    dtype=(jnp.float64,),  # jtu.dtypes.floating,
+    dtype=jtu.dtypes.floating,
     extrapolate=(True,),
     axis=(0,),
     nu=(0,),
   )
   def testPPoly(self, order, num_intervals, num_samples, dtype, extrapolate, axis, nu):
     rng = jtu.rand_default(self.rng())
-    x = onp.linspace(-10., 10., num_intervals + 1)
+    x = onp.linspace(-10., 10., num_intervals + 1, dtype=dtype)
     sp_fn = lambda c, xp: sp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
     jsp_fn = lambda c, xp: jsp_interp.PPoly(c, jnp.array(x), extrapolate, axis)(xp, nu)
     args_maker = lambda: (rng((order, num_intervals), dtype), rng(num_samples, dtype))
