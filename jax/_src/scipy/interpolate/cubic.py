@@ -45,19 +45,9 @@ class CubicHermiteSpline(PPoly):
 def _prepare_input(x: jax.Array, y: jax.Array, axis: int, dydx: typing.Optional[jax.Array] = None):
   if jnp.issubdtype(x.dtype, jnp.complexfloating):
     raise ValueError("`x` must contain real values.")
-  x = x.astype(float)
-  if jnp.issubdtype(y.dtype, jnp.complexfloating):
-    dtype = complex
-  else:
-    dtype = float
   if dydx is not None:
-    dydx = jnp.asarray(dydx)
     if y.shape != dydx.shape:
       raise ValueError("The shapes of `y` and `dydx` must be identical.")
-    if jnp.issubdtype(dydx.dtype, jnp.complexfloating):
-      dtype = complex
-    dydx = dydx.astype(dtype)
-  y = y.astype(dtype, copy=False)
   axis = axis % y.ndim
   if x.ndim != 1:
     raise ValueError("`x` must be 1-dimensional.")

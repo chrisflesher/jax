@@ -70,7 +70,9 @@ class _PPolyBase:
       raise NotImplementedError
     if nu < 0:
       raise ValueError("Order of derivative cannot be negative")
-    out = _evaluate(jnp.rollaxis(self.c, -2), self.x, x, nu, extrapolate)
+    c = jnp.moveaxis(self.c, [0, 1], [-2, -1])
+    import pdb; pdb.set_trace()
+    out = _evaluate(c, self.x, x, nu, extrapolate)
     # out = out.reshape(x.shape + self.c.shape[2:])
     # if self.axis != 0:
     #   l = list(range(out.ndim))
@@ -129,7 +131,7 @@ def _evaluate(c: jax.Array,
               extrapolate: bool,
               ) -> jax.Array:
   """Evaluate a piecewise polynomial."""
-  if c.shape[1] != x.shape[0] - 1:
+  if c.shape[-1] != x.shape[-1] - 1:
     raise ValueError("x and c have incompatible shapes")
   ascending = x[x.shape[0] - 1] >= x[0]
   i_ascending = _find_interval_ascending(x, xval, extrapolate)
@@ -149,7 +151,7 @@ def _evaluate_poly1(s: jax.Array, c: jax.Array, i: int, dx: int) -> jax.Array:
   return result
 
 
-@functools.partial(jnp.vectorize, signature='(m1),(),()->()')
+@functools.partial(jnp.vectorize, signature='(m1),(n),()->(n)')
 def _find_interval_ascending(x: jax.Array,
                              xval: jax.Array,
                              extrapolate: bool,
@@ -162,7 +164,7 @@ def _find_interval_ascending(x: jax.Array,
   return interval
 
 
-@functools.partial(jnp.vectorize, signature='(m1),(),()->()')
+@functools.partial(jnp.vectorize, signature='(m1),(n),()->(n)')
 def _find_interval_descending(x: jax.Array,
                               xval: jax.Array,
                               extrapolate: bool,
