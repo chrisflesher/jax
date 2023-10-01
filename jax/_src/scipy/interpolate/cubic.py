@@ -55,15 +55,9 @@ def _prepare_input(x: jax.Array, y: jax.Array, axis: int, dydx: typing.Optional[
     raise ValueError("`x` must contain at least 2 elements.")
   if x.shape[0] != y.shape[axis]:
     raise ValueError(f"The length of `y` along `axis`={axis} doesn't match the length of `x`")
-  if not jnp.all(jnp.isfinite(x)):
-    raise ValueError("`x` must contain only finite values.")
-  if not jnp.all(jnp.isfinite(y)):
-    raise ValueError("`y` must contain only finite values.")
-  if dydx is not None and not jnp.all(jnp.isfinite(dydx)):
-    raise ValueError("`dydx` must contain only finite values.")
   dx = jnp.diff(x)
-  if jnp.any(dx <= 0):
-    raise ValueError("`x` must be strictly increasing sequence.")
+  # if jnp.any(dx <= 0):  # TracerBoolConversionError
+  #   raise ValueError("`x` must be strictly increasing sequence.")
   y = jnp.moveaxis(y, axis, 0)
   if dydx is not None:
     dydx = jnp.moveaxis(dydx, axis, 0)

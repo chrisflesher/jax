@@ -71,8 +71,8 @@ class _PPolyBase:
     if nu < 0:
       raise ValueError("Order of derivative cannot be negative")
     c = jnp.moveaxis(self.c, [0, 1], [-2, -1])
-    import pdb; pdb.set_trace()
     out = _evaluate(c, self.x, x, nu, extrapolate)
+    out = out.T  # HACK: this line probably needs more work...
     # out = out.reshape(x.shape + self.c.shape[2:])
     # if self.axis != 0:
     #   l = list(range(out.ndim))
