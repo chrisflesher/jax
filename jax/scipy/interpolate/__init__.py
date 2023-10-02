@@ -16,6 +16,7 @@
 
 
 from jax._src.scipy.interpolate.cubic import (
+    Akima1DInterpolator as Akima1DInterpolator,
     CubicHermiteSpline as CubicHermiteSpline)
 
 from jax._src.scipy.interpolate.ppoly import (

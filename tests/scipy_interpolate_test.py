@@ -33,25 +33,6 @@ class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
   """Tests for LAX-backed scipy.interpolate implementations"""
 
   @jtu.sample_product(
-    order=(1, 2, 3),
-    num_intervals=(11,),
-    num_samples=(1, NUM_SAMPLES),
-    dtype=jtu.dtypes.floating,
-    extrapolate=(True,),
-    axis=(0,),
-    nu=(0,),
-  )
-  def testPPoly(self, order, num_intervals, num_samples, dtype, extrapolate, axis, nu):
-    rng = jtu.rand_default(self.rng())
-    x = onp.linspace(-10., 10., num_intervals + 1, dtype=dtype)
-    sp_fn = lambda c, xp: sp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
-    jsp_fn = lambda c, xp: jsp_interp.PPoly(c, jnp.array(x), extrapolate, axis)(xp, nu)
-    args_maker = lambda: (rng((order, num_intervals), dtype),
-                          rng(num_samples, dtype))
-    self._CheckAgainstNumpy(sp_fn, jsp_fn, args_maker, check_dtypes=False, tol=1e-4)
-    self._CompileAndCheck(jsp_fn, args_maker, rtol={onp.float64: 1e-14})
-
-  @jtu.sample_product(
     num_intervals=(11,),
     num_dims=(1, 2),
     num_samples=(1, NUM_SAMPLES),
@@ -67,6 +48,25 @@ class LaxBackedScipyInterpolateTests(jtu.JaxTestCase):
     jsp_fn = lambda y, dydx, xp: jsp_interp.CubicHermiteSpline(x, y, dydx, axis, extrapolate)(xp, nu)
     args_maker = lambda: (rng((num_intervals + 1, num_dims), dtype),
                           rng((num_intervals + 1, num_dims), dtype),
+                          rng(num_samples, dtype))
+    self._CheckAgainstNumpy(sp_fn, jsp_fn, args_maker, check_dtypes=False, tol=1e-4)
+    self._CompileAndCheck(jsp_fn, args_maker, rtol={onp.float64: 1e-14})
+
+  @jtu.sample_product(
+    order=(1, 2, 3),
+    num_intervals=(11,),
+    num_samples=(1, NUM_SAMPLES),
+    dtype=jtu.dtypes.floating,
+    extrapolate=(True,),
+    axis=(0,),
+    nu=(0,),
+  )
+  def testPPoly(self, order, num_intervals, num_samples, dtype, extrapolate, axis, nu):
+    rng = jtu.rand_default(self.rng())
+    x = onp.linspace(-10., 10., num_intervals + 1, dtype=dtype)
+    sp_fn = lambda c, xp: sp_interp.PPoly(c, x, extrapolate, axis)(xp, nu)
+    jsp_fn = lambda c, xp: jsp_interp.PPoly(c, jnp.array(x), extrapolate, axis)(xp, nu)
+    args_maker = lambda: (rng((order, num_intervals), dtype),
                           rng(num_samples, dtype))
     self._CheckAgainstNumpy(sp_fn, jsp_fn, args_maker, check_dtypes=False, tol=1e-4)
     self._CompileAndCheck(jsp_fn, args_maker, rtol={onp.float64: 1e-14})
